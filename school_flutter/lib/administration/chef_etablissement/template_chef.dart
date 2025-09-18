@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:school_flutter/administration/chef_etablissement/chef_subscription_screen.dart';
 import 'package:school_flutter/administration/chef_etablissement/chef_etablissement_bashboard.dart';
 import 'package:school_flutter/administration/censeur/censeur_workspace_screen.dart';
@@ -6,129 +9,92 @@ import 'package:school_flutter/administration/caissier/financier_workspace_scree
 import 'package:school_flutter/administration/enseignant/teacher_workspace_screen.dart';
 import 'package:school_flutter/administration/acceuil/pulic_home_screens.dart';
 
+class AuthService {
+  static String? _accessToken;
+  static String? _refreshToken;
+  static Map<String, dynamic>? _userInfo;
+
+  // Getters
+  static String? get accessToken => _accessToken;
+  static String? get refreshToken => _refreshToken;
+  static Map<String, dynamic>? get userInfo => _userInfo;
+
+  // Sauvegarder les tokens après connexion
+  static Future<void> saveTokens({
+    required String accessToken,
+    required String refreshToken,
+    Map<String, dynamic>? userInfo,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    _accessToken = accessToken;
+    _refreshToken = refreshToken;
+    _userInfo = userInfo;
+    await prefs.setString('access_token', accessToken);
+    await prefs.setString('refresh_token', refreshToken);
+    if (userInfo != null) {
+      await prefs.setString('user_info', jsonEncode(userInfo));
+    }
+  }
+
+  // Charger les tokens au démarrage de l'app
+  static Future<void> loadTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    _accessToken = prefs.getString('access_token');
+    _refreshToken = prefs.getString('refresh_token');
+    final userInfoString = prefs.getString('user_info');
+    if (userInfoString != null) {
+      _userInfo = jsonDecode(userInfoString);
+    }
+  }
+
+  // Supprimer les tokens (déconnexion)
+  static Future<void> clearTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    _accessToken = null;
+    _refreshToken = null;
+    _userInfo = null;
+    await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
+    await prefs.remove('user_info');
+  }
+
+  // Vérifier si l'utilisateur est connecté
+  static bool get isLoggedIn => _accessToken != null;
+
+  // Headers avec authentification
+  static Map<String, String> get authHeaders => {
+        'Content-Type': 'application/json',
+        if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
+      };
+
+  // Headers pour multipart avec authentification
+  static Map<String, String> get authHeadersMultipart => {
+        if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
+      };
+}
+
 class ChefEtablissementbashboardTemplate extends StatefulWidget {
   const ChefEtablissementbashboardTemplate({super.key});
 
   @override
-  State<ChefEtablissementbashboardTemplate> createState() => _ChefEtablissementbashboardTemplateState();
+  State<ChefEtablissementbashboardTemplate> createState() =>
+      _ChefEtablissementbashboardTemplateState();
 }
 
-class _ChefEtablissementbashboardTemplateState extends State<ChefEtablissementbashboardTemplate> {
-
+class _ChefEtablissementbashboardTemplateState
+    extends State<ChefEtablissementbashboardTemplate> {
   void _deconnexion(BuildContext context) {
+    AuthService.clearTokens(); // Clear tokens on logout
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const TemplateChefLogin()),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard Chef Établissement'),
-        backgroundColor:  Colors.blue,
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
-        ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    child: Icon(
-                      Icons.person,
-                      size: 40,
-                      color: Color(0xFF2D3748),
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Chef d\'établissement',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.home),
-              title: const Text('Accueil'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.subscriptions),
-              title: const Text('Souscription'),
-              onTap: () { 
-                Navigator.pop(context);
-                _showCodeEtablissementDialog();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.work),
-              title: const Text('Espace de travail'),
-              onTap: () {
-                Navigator.pop(context);
-                _navigateToChefEtablissementWorkspace();
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Déconnexion'),
-              onTap: () => _deconnexion(context),
-            ),
-          ],
-        ),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.dashboard,
-              size: 80,
-              color: Color(0xFF2D3748),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Bienvenue Chef d\'établissement',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2D3748),
-              ),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Utilisez le menu pour naviguer',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Correction du nom de la méthode et navigation vers l'espace de travail
   void _navigateToChefEtablissementWorkspace() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const ChefLogin()),
+      MaterialPageRoute(builder: (context) => const ChefLogin()), // Updated to avoid circular navigation
     );
   }
 
@@ -136,7 +102,7 @@ class _ChefEtablissementbashboardTemplateState extends State<ChefEtablissementba
     final controller = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
-    
+
     // Données fictives pour la démonstration (remplacez par votre API ou base de données)
     final Map<String, String> _mockEtablissements = {
       'CODE123': 'Lycée Moderne',
@@ -370,11 +336,110 @@ class _ChefEtablissementbashboardTemplateState extends State<ChefEtablissementba
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dashboard Chef Établissement'),
+        backgroundColor: Colors.blue,
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                color: Colors.blue,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.person,
+                      size: 40,
+                      color: Color(0xFF2D3748),
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'Chef d\'établissement',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Accueil'),
+              onTap: () {
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.subscriptions),
+              title: const Text('Souscription'),
+              onTap: () {
+                Navigator.pop(context);
+                _showCodeEtablissementDialog();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.work),
+              title: const Text('Espace de travail'),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToChefEtablissementWorkspace();
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Déconnexion'),
+              onTap: () => _deconnexion(context),
+            ),
+          ],
+        ),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.dashboard,
+              size: 80,
+              color: Color(0xFF2D3748),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'Bienvenue Chef d\'établissement',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2D3748),
+              ),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Utilisez le menu pour naviguer',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-/// --------------------
-/// PAGE DE CONNEXION (Design original conservé)
-/// --------------------
 class TemplateChefLogin extends StatefulWidget {
   const TemplateChefLogin({super.key});
 
@@ -383,78 +448,110 @@ class TemplateChefLogin extends StatefulWidget {
 }
 
 class _TemplateChefLoginState extends State<TemplateChefLogin> {
-  bool _obscurePassword = true;
-  final _ineController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-void _login() {
-  String email = _ineController.text.trim();
-  String password = _passwordController.text.trim();
+  bool _obscurePassword = true;
+  bool _isLoading = false;
 
-  // Exemple de comptes fictifs
-  Map<String, Map<String, dynamic>> utilisateurs = {
-    "chef@gmail.com": {
-      "password": "1234",
-      "role": "chef",
-    },
-    "censeur@gmail.com": {
-      "password": "1234",
-      "role": "censeur",
-    },
-    "enseignant@gmail.com": {
-      "password": "1234",
-      "role": "enseignant",
-    },
-    "caissier@gmail.com": {
-      "password": "1234",
-      "role": "caissier",
-    },
-  };
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
 
-  if (utilisateurs.containsKey(email) &&
-      utilisateurs[email]!["password"] == password) {
-    String role = utilisateurs[email]!["role"];
+    setState(() => _isLoading = true);
 
-    Widget destination;
+    final url = Uri.parse("http://127.0.0.1:8000/api/utilisateurs/login/");
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": _emailController.text.trim(),
+          "password": _passwordController.text.trim(),
+        }),
+      );
 
-    switch (role) {
-      case "chef":
-        destination = const ChefEtablissementbashboardTemplate();
-        break;
-      case "censeur":
-        destination = const CenseurWorkspaceScreen();
-        break;
-      case "enseignant":
-        destination = const TeacherWorkspaceScreen();
-        break;
-      case "caissier":
-        destination = const FinancierWorkspaceScreen();
-        break;
-      default:
-        destination = const Scaffold(
-          body: Center(child: Text("Rôle non reconnu")),
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data["access"] != null) {
+        // Enregistrer les tokens et les infos utilisateur avec AuthService
+        await AuthService.saveTokens(
+          accessToken: data["access"],
+          refreshToken: data["refresh"],
+          userInfo: data["user"],
         );
+
+        // Extraire le rôle depuis les infos utilisateur
+        final role = data["user"]?["role"]?.toString().toLowerCase();
+
+        // Rediriger selon le rôle
+        Widget destination;
+        switch (role) {
+          case "chef":
+            destination = const ChefEtablissementbashboardTemplate();
+            break;
+          case "censeur":
+            destination = const CenseurWorkspaceScreen();
+            break;
+          case "enseignant":
+            destination = const TeacherWorkspaceScreen();
+            break;
+          case "caissier":
+            destination = const FinancierWorkspaceScreen();
+            break;
+          default:
+            destination = const PublicHomeScreen();
+            break;
+        }
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => destination),
+          );
+        }
+      } else {
+        final errorMsg = data["detail"] ?? "Identifiants incorrects";
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMsg),
+              backgroundColor: Colors.red[400],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          _emailController.clear();
+          _passwordController.clear();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Impossible de se connecter au serveur"),
+            backgroundColor: Colors.red[400],
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => destination),
-    );
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Identifiants incorrects")),
-    );
-     _ineController.clear();
-  _passwordController.clear();
   }
-}
 
-  // Fonction pour gérer le retour
- void _goBack() {
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (context) => const PublicHomeScreen()),
-    (Route<dynamic> route) => false, // supprime toutes les anciennes routes
-  );
-}
+  void _goBack() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const PublicHomeScreen()),
+      (Route<dynamic> route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -492,8 +589,8 @@ void _login() {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFE8E8F5), // Couleur lilas très claire
-              Color(0xFFF5F5F5), // Blanc cassé
+              Color(0xFFE8E8F5),
+              Color(0xFFF5F5F5),
             ],
           ),
         ),
@@ -510,138 +607,159 @@ void _login() {
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 400),
                   padding: const EdgeInsets.all(32.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Titre
-                      const Text(
-                        "Connexion - Administration",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF2D3748),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          "Connexion - Administration",
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2D3748),
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 32),
-                      
-                      // Champ Identifiant
-                      TextField(
-                        controller: _ineController,
-                        decoration: InputDecoration(
-                          hintText: "Email (abdoul@gmail.com)",
-                          hintStyle: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 16,
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.grey[300]!,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.grey[300]!,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color.fromARGB(255, 107, 196, 255),
-                              width: 2,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      
-                      // Champ Mot de passe
-                     TextField(
-  controller: _passwordController,
-  obscureText: _obscurePassword,
-  decoration: InputDecoration(
-    hintText: "Mot de passe (1234)",
-    hintStyle: TextStyle(
-      color: Colors.grey[600],
-      fontSize: 16,
-    ),
-    filled: true,
-    fillColor: Colors.grey[50],
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(
-        color: Colors.grey[300]!,
-      ),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(
-        color: Colors.grey[300]!,
-      ),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(
-        color: Color.fromARGB(255, 107, 201, 255),
-        width: 2,
-      ),
-    ),
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: 16,
-      vertical: 16,
-    ),
-    // 👇 Ajout du bouton pour afficher/masquer
-    suffixIcon: IconButton(
-      icon: Icon(
-        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-        color: Colors.grey[700],
-      ),
-      onPressed: () {
-        setState(() {
-          _obscurePassword = !_obscurePassword;
-        });
-      },
-    ),
-  ),
-),
-                      const SizedBox(height: 24),
-                      
-                      // Bouton de connexion
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color.fromARGB(255, 107, 176, 255),
-                            foregroundColor: Colors.white,
-                            elevation: 2,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            "Se connecter",
-                            style: TextStyle(
+                        const SizedBox(height: 32),
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: InputDecoration(
+                            hintText: "Email",
+                            hintStyle: TextStyle(
+                              color: Colors.grey[600],
                               fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.grey[300]!,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.grey[300]!,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: Color.fromARGB(255, 107, 196, 255),
+                                width: 2,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
                             ),
                           ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer un email';
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                .hasMatch(value)) {
+                              return 'Veuillez entrer un email valide';
+                            }
+                            return null;
+                          },
                         ),
-                      ),
-                      
-                      
-                      
-                    
-                    ],
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          decoration: InputDecoration(
+                            hintText: "Mot de passe",
+                            hintStyle: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 16,
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.grey[300]!,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.grey[300]!,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: Color.fromARGB(255, 107, 201, 255),
+                                width: 2,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.grey[700],
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer un mot de passe';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  const Color.fromARGB(255, 107, 176, 255),
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor:
+                                          AlwaysStoppedAnimation<Color>(
+                                              Colors.white),
+                                    ),
+                                  )
+                                : const Text(
+                                    "Se connecter",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -650,5 +768,12 @@ void _login() {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 }
