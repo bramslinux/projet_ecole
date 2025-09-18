@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Emploi du temps - Salle {{ salle.nom }}</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            text-align: center;
+            padding: 5px;
+        }
+        th {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h2>Emploi du temps - Salle {{ salle.nom }}</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Jour</th>
+                <th>Heure début</th>
+                <th>Durée</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Cours</th>
+                <th>Enseignant</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for seance in seances %}
+            <tr>
+                <td>{{ seance.jours }}</td>
+                <td>{{ seance.heure_debut }}</td>
+                <td>{{ seance.duree }} min</td>
+                <td>{{ seance.type }}</td>
+                <td>{{ seance.status }}</td>
+                <td>{{ seance.cours.nom }}</td>
+                <td>{{ seance.enseignant.nom }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

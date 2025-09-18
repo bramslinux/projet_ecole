@@ -1,0 +1,54 @@
+name: school_flutter
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.2.2
+  image_picker: ^1.1.2
+  file_picker: ^10.3.2
+  # Packages pour le glassmorphism et animations
+  glassmorphism: ^3.0.0
+  animated_text_kit: ^4.2.2
+  lottie: ^3.1.2
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+  # Package pour les graphiques
+  fl_chart: ^0.66.2
+  # Package pour Google Maps
+  google_maps_flutter: ^2.5.3
+  shared_preferences: ^2.2.2
+  
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_localizations:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  
+  # Assets pour les animations et images
+  assets:
+    - assets/images/
+    - assets/animations/
+    - assets/icons/
+
+  # Fonts personnalisées
+  #fonts:
+   # - family: Montserrat
+    #  fonts:
+        
+     #   - asset: assets/fonts/Montserrat-Bold.ttf
+      #    weight: 700
+       # - asset: assets/fonts/Montserrat-Light.ttf
+        #  weight: 300
